@@ -1,19 +1,45 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
-
-const app = express();
-// Serve the files in /assets at the URI /assets.
-app.use('/assets', express.static('assets'));
+import fs from 'fs';
+import path from 'path';
+import {sendMessageAndGetResponse} from './textToSpeechService';
+import {AUDIO_DIR} from './constants';
+import bodyParser from 'body-parser';
 
 const APP_VERSION = process.env.VERSION || '0.0.02';
 const NODE_VERSION = process.version;
 
-// The HTML content is produced by rendering a handlebars template.
-// The template values are stored in global state for reuse.
-const data = {
-  service: process.env.K_SERVICE || '???',
-  revision: process.env.K_REVISION || '???',
-};
-let template;
+const app = express();
+
+app.use(bodyParser.json()); // for parsing application/json
+app.use(bodyParser.urlencoded({extended: true})); // for parsing application/x-www-form-urlencoded
+
+// POST endpoint '/send_message'
+app.post('/send_message', async (req, res) => {
+  console.log('REQ', req);
+  const {message} = req.body;
+  if (!message) {
+    res.status(400).json({error: 'Message is required', response: null});
+  }
+
+  try {
+    const response = await sendMessageAndGetResponse(message, req);
+    res.json({error: null, response});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({error: 'Internal server error', response: null});
+  }
+});
+
+// Ensure the 'audio' directory exists for storing audio files
+
+if (!fs.existsSync(AUDIO_DIR)) {
+  fs.mkdirSync(AUDIO_DIR);
+}
+
+// Serve static files from the 'audio' directory
+app.use('/audio', express.static(AUDIO_DIR));
 
 app.get('/', async (req, res) => {
   res.json({
