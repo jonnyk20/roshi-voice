@@ -1,5 +1,5 @@
 {
-  "name": "nodejs-cloud-run-hello-world",
+  "name": "roshi-voice",
   "version": "0.0.1",
   "description": "Hello World application for Cloud Run",
   "main": "index.js",
@@ -12,7 +12,7 @@
   "author": "Google LLC",
   "license": "0BSD",
   "engines": {
-    "node": ">=11.14"
+    "node": ">=20.18.0"
   },
   "dependencies": {
     "express": "^4.17.1",
