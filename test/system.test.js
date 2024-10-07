@@ -1,7 +1,7 @@
 const assert = require('assert');
 const {request} = require('gaxios');
 
-const port = process.env.PORT || '8081';
+const port = process.env.PORT || '8080';
 const url = process.env.SERVICE_URL || `http://localhost:${port}`;
 const token = process.env.TOKEN || '';
 
