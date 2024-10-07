@@ -7,7 +7,7 @@ import {sendMessageAndGetResponse} from './textToSpeechService';
 import {AUDIO_DIR} from './constants';
 import bodyParser from 'body-parser';
 
-const APP_VERSION = process.env.VERSION || '0.0.02';
+const APP_VERSION = process.env.VERSION || '0.0.03';
 const NODE_VERSION = process.version;
 
 const app = express();
