@@ -4,7 +4,7 @@ const app = express();
 // Serve the files in /assets at the URI /assets.
 app.use('/assets', express.static('assets'));
 
-const APP_VERSION = process.env.VERSION || '0.0.01';
+const APP_VERSION = process.env.VERSION || '0.0.02';
 const NODE_VERSION = process.version;
 
 // The HTML content is produced by rendering a handlebars template.
