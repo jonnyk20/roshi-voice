@@ -110,3 +110,5 @@ dist
 
 
 *.wav
+
+.DS_Store

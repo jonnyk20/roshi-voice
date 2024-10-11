@@ -7,7 +7,7 @@ import {sendMessageAndGetResponse} from './textToSpeechService';
 import {AUDIO_DIR} from './constants';
 import bodyParser from 'body-parser';
 
-const APP_VERSION = process.env.VERSION || '0.0.04';
+const APP_VERSION = process.env.VERSION || '0.0.05';
 const NODE_VERSION = process.version;
 
 const app = express();
@@ -18,14 +18,17 @@ app.use(bodyParser.urlencoded({extended: true})); // for parsing application/x-w
 // POST endpoint '/send_message'
 app.post('/send_message', async (req, res) => {
   console.log('REQ', req);
-  const {message} = req.body;
-  if (!message) {
-    res.status(400).json({error: 'Message is required', response: null});
+  const {text, instructions} = req.body;
+  if (!text) {
+    res.status(400).json({error: 'Text is required', response: null});
   }
 
   try {
-    const response = await sendMessageAndGetResponse(message, req);
-    res.json({error: null, response});
+    const response = await sendMessageAndGetResponse(
+      JSON.stringify({text, instructions}),
+      req
+    );
+    res.json(response);
   } catch (error) {
     console.error(error);
     res.status(500).json({error: 'Internal server error', response: null});
@@ -45,6 +48,7 @@ app.get('/', async (req, res) => {
   res.json({
     appVersion: APP_VERSION,
     nodeVersion: NODE_VERSION,
+    api: process.env.OPENAI_API_KEY,
   });
 });
 

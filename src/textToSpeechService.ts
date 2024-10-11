@@ -99,7 +99,8 @@ export async function sendMessageAndGetResponse(
           type: 'response.create',
           response: {
             modalities: ['audio', 'text'],
-            instructions: 'Please assist the user.',
+            instructions:
+              'Please speak using the given instructions. You will receive a json with text, and speaking instructions. Repeat the text, making adjustments based on the instructions if needed (Treat it as SSML).',
           },
         })
       );
@@ -153,6 +154,7 @@ export async function sendMessageAndGetResponse(
             resolve({
               audioUrl,
               transcript,
+              error: '',
             });
             break;
 
