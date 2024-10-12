@@ -1,13 +1,13 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import '@/config';
 import express from 'express';
 import fs from 'fs';
-import path from 'path';
+
 import {sendMessageAndGetResponse} from './textToSpeechService';
 import {AUDIO_DIR} from './constants';
 import bodyParser from 'body-parser';
 
-const APP_VERSION = process.env.VERSION || '0.0.05';
+const APP_VERSION = process.env.VERSION || '0.0.07';
+const ENV = process.env.ENV || '??';
 const NODE_VERSION = process.version;
 
 const app = express();
@@ -44,11 +44,13 @@ if (!fs.existsSync(AUDIO_DIR)) {
 // Serve static files from the 'audio' directory
 app.use('/audio', express.static(AUDIO_DIR));
 
+const hasKey = !!process.env.OPENAI_API_KEY;
 app.get('/', async (req, res) => {
   res.json({
     appVersion: APP_VERSION,
     nodeVersion: NODE_VERSION,
-    api: process.env.OPENAI_API_KEY,
+    hasKey,
+    env: ENV,
   });
 });
 

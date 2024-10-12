@@ -1,6 +1,7 @@
 import {Request} from 'express';
 import WebSocket, {RawData} from 'ws';
-
+import dotenv from 'dotenv';
+dotenv.config();
 import fs from 'fs';
 import path from 'path';
 import {AUDIO_DIR} from './constants';
