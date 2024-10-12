@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 # Copy application dependency manifests to the container image.
 # A wildcard is used to ensure both package.json AND package-lock.json are copied.
 # Copying this separately prevents re-running npm install on every code change.
-COPY package*.json ./
+COPY package*.json tsconfig.json ./
 
 # Install all dependencies (including devDependencies)
 RUN npm install
@@ -36,9 +36,15 @@ RUN npm install --production
 # Copy the built files from the builder stage
 COPY --from=builder /usr/src/app/dist ./dist
 
+# Copy tsconfig.json from the build stage
+COPY --from=builder /usr/src/app/tsconfig.json ./tsconfig.json
+
 # Expose the port
 EXPOSE 8080
 
+# List files to verify
+RUN ls -al
+
 # Run the web service on container startup.
 # Run the application
-CMD ["node", "dist/index.js"]
+CMD ["npm", "run", "start"]

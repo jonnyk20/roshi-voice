@@ -7,7 +7,6 @@ export const loadEnvVarsFromSecret = async () => {
     // Get project ID and environment from environment variables
     const projectId = process.env.GCP_PROJECT_ID;
     const env = process.env.ENV || 'Unknown';
-
     // Construct the secret name
     const secretName = `projects/${projectId}/secrets/roshi-server-env-vars--${env}/versions/latest`;
 

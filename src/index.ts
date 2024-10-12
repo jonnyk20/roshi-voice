@@ -48,6 +48,8 @@ const hasKey = !!process.env.OPENAI_API_KEY;
 app.get('/', async (req, res) => {
   res.json({
     appVersion: APP_VERSION,
+    projectId: process.env.GCP_PROJECT_ID,
+    npmVersion: process.env.npm_package_version,
     nodeVersion: NODE_VERSION,
     hasKey,
     env: ENV,
