@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
-    "@types/node": "^22.7.4",
+    "@types/node": "^22.7.5",
     "@types/ws": "^8.5.12",
     "eslint": "8.54.0",
     "eslint-config-prettier": "8.10.0",
