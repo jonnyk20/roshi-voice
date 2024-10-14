@@ -7,7 +7,7 @@ import path from 'path';
 import {AUDIO_DIR} from './constants';
 
 // Function to save audio data and return the audio URL
-async function saveAudio(audioBuffer: RawData, req: Request) {
+function saveAudio(audioBuffer: RawData, req: Request) {
   // Generate a unique filename for the audio file
   const audioFileName = `response_${Date.now()}.wav`;
   const audioFilePath = path.join(AUDIO_DIR, audioFileName);
@@ -108,7 +108,7 @@ export async function sendMessageAndGetResponse(
     });
 
     // Handle incoming messages from the server
-    ws.on('message', async (data) => {
+    ws.on('message', (data) => {
       try {
         const event = JSON.parse(data as any);
         const {type: eventType} = event;
@@ -144,7 +144,7 @@ export async function sendMessageAndGetResponse(
             const fullAudioBuffer = Buffer.concat(audioData);
 
             // Save the audio and get the URL
-            const audioUrl = await saveAudio(fullAudioBuffer, req);
+            const audioUrl = saveAudio(fullAudioBuffer, req);
 
             console.log(`Audio saved and accessible at ${audioUrl}`);
 

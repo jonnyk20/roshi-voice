@@ -18,8 +18,6 @@ export const loadEnvVarsFromSecret = async () => {
     // Extract the payload as a string
     const payload = version?.payload?.data?.toString() || '';
 
-    console.log('payload', payload);
-
     // Parse the JSON data
     const variables = JSON.parse(payload);
 
