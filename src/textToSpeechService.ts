@@ -5,6 +5,64 @@ dotenv.config();
 import fs from 'fs';
 import path from 'path';
 import {AUDIO_DIR} from './constants';
+import {firebaseStorage} from './firebase';
+
+// Function to save audio data to Firebase Storage and return the signed URL
+async function saveAudioToFirebaseStorage(
+  audioBuffer: Buffer
+): Promise<string> {
+  // Generate a unique filename for the audio file
+  const audioFileName = `AAA/response_${Date.now()}.wav`;
+
+  // Get a reference to the Firebase Storage bucket
+  const bucket = firebaseStorage.bucket();
+
+  // Create a file object in Firebase Storage
+  const file = bucket.file(audioFileName);
+
+  // Define WAV file parameters
+  const numChannels = 1; // Mono
+  const sampleRate = 24000; // 24,000 Hz
+  const bitsPerSample = 16;
+  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const subchunk2Size = audioBuffer.length; // Data size in bytes
+  const chunkSize = 36 + subchunk2Size; // Total chunk size
+
+  // Create a buffer for the WAV file header
+  const header = Buffer.alloc(44);
+
+  // Write the WAV file header
+  header.write('RIFF', 0); // ChunkID
+  header.writeUInt32LE(chunkSize, 4); // ChunkSize
+  header.write('WAVE', 8); // Format
+  header.write('fmt ', 12); // Subchunk1ID
+  header.writeUInt32LE(16, 16); // Subchunk1Size (16 for PCM)
+  header.writeUInt16LE(1, 20); // AudioFormat (1 for PCM)
+  header.writeUInt16LE(numChannels, 22); // NumChannels
+  header.writeUInt32LE(sampleRate, 24); // SampleRate
+  header.writeUInt32LE(byteRate, 28); // ByteRate
+  header.writeUInt16LE(blockAlign, 32); // BlockAlign
+  header.writeUInt16LE(bitsPerSample, 34); // BitsPerSample
+  header.write('data', 36); // Subchunk2ID
+  header.writeUInt32LE(subchunk2Size, 40); // Subchunk2Size
+
+  // Combine header and audio data
+  const wavData = Buffer.concat([header, audioBuffer]);
+
+  // Upload the audio buffer to Firebase Storage
+  await file.save(wavData, {
+    metadata: {
+      contentType: 'audio/wav',
+    },
+  });
+
+  await file.makePublic();
+  const publicUrl = file.publicUrl();
+
+  // Return the signed URL
+  return publicUrl;
+}
 
 // Function to save audio data and return the audio URL
 function saveAudio(audioBuffer: RawData, req: Request) {
@@ -144,25 +202,32 @@ export async function sendMessageAndGetResponse(
             const fullAudioBuffer = Buffer.concat(audioData);
 
             // Save the audio and get the URL
-            const audioUrl = saveAudio(fullAudioBuffer, req);
+            // const audioUrl = saveAudio(fullAudioBuffer, req);
+            return saveAudioToFirebaseStorage(fullAudioBuffer)
+              .then((audioUrl) => {
+                // Close the WebSocket connection here
+                ws.close();
 
-            console.log(`Audio saved and accessible at ${audioUrl}`);
+                // Resolve the Promise with the response data
+                resolve({
+                  audioUrl,
+                  transcript,
+                  error: '',
+                });
+              })
+              .catch((error) => {
+                console.error('Error saving audio:', error);
 
-            // Close the WebSocket connection
-            ws.close();
+                // Close the WebSocket connection on error
+                ws.close();
 
-            // Resolve the Promise with the response data
-            resolve({
-              audioUrl,
-              transcript,
-              error: '',
-            });
-            break;
+                reject(error);
+              });
 
           case 'error':
             console.error('Error from assistant:', event.error);
             ws.close();
-            reject(new Error('Error from assistant: ' + event.error.message));
+            reject(new Error('Error from assistant: ' + event.error?.message));
             break;
 
           default:

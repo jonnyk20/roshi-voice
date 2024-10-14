@@ -17,7 +17,6 @@ app.use(bodyParser.urlencoded({extended: true})); // for parsing application/x-w
 
 // POST endpoint '/send_message'
 app.post('/send_message', async (req, res) => {
-  console.log('REQ', req);
   const {text, instructions} = req.body;
   if (!text) {
     res.status(400).json({error: 'Text is required', response: null});
@@ -28,6 +27,7 @@ app.post('/send_message', async (req, res) => {
       JSON.stringify({text, instructions}),
       req
     );
+
     res.json(response);
   } catch (error) {
     console.error(error);
