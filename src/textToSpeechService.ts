@@ -12,7 +12,7 @@ async function saveAudioToFirebaseStorage(
   audioBuffer: Buffer
 ): Promise<string> {
   // Generate a unique filename for the audio file
-  const audioFileName = `AAA/response_${Date.now()}.wav`;
+  const audioFileName = `directed-voice/response_${Date.now()}.wav`;
 
   // Get a reference to the Firebase Storage bucket
   const bucket = firebaseStorage.bucket();
