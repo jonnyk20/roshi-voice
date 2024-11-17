@@ -17,15 +17,17 @@ app.use(bodyParser.urlencoded({extended: true})); // for parsing application/x-w
 
 // POST endpoint '/send_message'
 app.post('/send_message', async (req, res) => {
-  const {text, instructions} = req.body;
+  const {text, instructions, voice = 'ballad'} = req.body;
   if (!text) {
     res.status(400).json({error: 'Text is required', response: null});
   }
 
   try {
     const response = await sendMessageAndGetResponse(
-      JSON.stringify({text, instructions}),
-      req
+      req,
+      text,
+      voice,
+      instructions
     );
 
     res.json(response);
@@ -56,7 +58,7 @@ app.get('/', async (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8082;
 app.listen(PORT, () => {
   console.log(
     `Hello from Cloud Run! The container started successfully and is listening for HTTP requests on ${PORT}`
