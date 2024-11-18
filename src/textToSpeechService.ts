@@ -7,6 +7,17 @@ import path from 'path';
 import {AUDIO_DIR} from './constants';
 import {firebaseStorage} from './firebase';
 
+function recursivelySetKey<T>(obj: T, key: string, value: any): T {
+  const newObj: T = {...obj};
+  for (const k in newObj) {
+    if (k === key) {
+      newObj[k] = value;
+    } else if (typeof newObj[k] === 'object') {
+      newObj[k] = recursivelySetKey(newObj[k], key, value);
+    }
+  }
+  return newObj;
+}
 function createWavData(audioData: Int16Array): Buffer {
   // Define WAV file parameters
   const numChannels = 1; // Mono
@@ -137,68 +148,96 @@ export async function sendMessageAndGetResponse(
         'OpenAI-Beta': 'realtime=v1',
       },
     });
+    // Define the messages to send: first "Hello World", then the desired phrase
+    const messages = [
+      {
+        text: 'Hello World',
+        voice,
+        instructions:
+          'You are a text-to-speech assistant used to generate audio for a lesson. Please read the given text in a natural tone.',
+      },
+      {
+        text: text, // The desired phrase
+        instructions:
+          instructions ||
+          'You are a text-to-speech assistant used to generate audio for a lesson. Please read the given text in a natural tone.',
+      },
+    ];
 
-    let audioData = new Int16Array(0); // Use Int16Array for audio data
-    let transcript = '';
+    let currentMessageIndex = 0;
+    let currentAudioData = new Int16Array(0); // Audio data for the current message
+    let currentTranscript = ''; // Transcript for the current message
     let processingCompleted = false; // Flag to prevent further processing
 
-    let prompt =
-      'You are a text-to-speech assistant used to generate audio for a lesson. Please read the given text in a natural tone.';
+    function sendNextMessage(voice: string = '') {
+      if (currentMessageIndex < messages.length) {
+        const message = messages[currentMessageIndex];
 
-    let input: Object = {
-      text: text,
-    };
+        // Initialize data for this message
+        currentAudioData = new Int16Array(0);
+        currentTranscript = '';
+        processingCompleted = false;
 
-    if (!!instructions) {
-      prompt = instructions;
-      input = {
-        text: text,
-        instructions: instructions,
-      };
+        // Prepare the input
+        const input = {
+          text: message.text,
+          instructions: message.instructions || '',
+        };
+
+        // Send the user's message to the assistant
+        ws.send(
+          JSON.stringify({
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: JSON.stringify(input),
+                },
+              ],
+            },
+          })
+        );
+
+        let response: Object = {
+          modalities: ['audio', 'text'],
+          instructions: message.instructions,
+        };
+
+        // Request the assistant's response with audio and text modalities
+        ws.send(
+          JSON.stringify({
+            type: 'response.create',
+            response,
+          })
+        );
+      } else {
+        // All messages sent, close the connection
+        ws.close();
+      }
     }
 
     ws.on('open', function open() {
-      console.log('Connected to OpenAI Realtime API.');
-
-      // Send the user's message to the assistant
       ws.send(
         JSON.stringify({
-          type: 'conversation.item.create',
-          item: {
-            type: 'message',
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: JSON.stringify(input),
-              },
-            ],
+          type: 'session.update',
+          session: {
+            voice: voice,
           },
         })
       );
 
-      // Request the assistant's response with audio and text modalities
-      ws.send(
-        JSON.stringify({
-          type: 'response.create',
-          response: {
-            voice,
-            modalities: ['audio', 'text'],
-            instructions: prompt,
-          },
-        })
-      );
+      // Send the first message
+      sendNextMessage();
     });
 
     // Handle incoming messages from the server
     ws.on('message', (data) => {
-      if (processingCompleted) {
-        return; // Ignore any further messages after processing is complete
-      }
       try {
         const event = JSON.parse(data.toString());
         const {type: eventType} = event;
-        console.log(`Received event: ${eventType}`);
 
         switch (eventType) {
           case 'response.audio.delta':
@@ -210,61 +249,89 @@ export async function sendMessageAndGetResponse(
 
               // Merge the new audio data with existing data
               const mergedAudioData = new Int16Array(
-                audioData.length + appendData.length
+                currentAudioData.length + appendData.length
               );
-              mergedAudioData.set(audioData);
-              mergedAudioData.set(appendData, audioData.length);
-              audioData = mergedAudioData;
+              mergedAudioData.set(currentAudioData);
+              mergedAudioData.set(appendData, currentAudioData.length);
+              currentAudioData = mergedAudioData;
             }
             break;
 
           case 'response.audio_transcript.delta':
             {
               const {delta: transcriptDelta} = event;
-              transcript += transcriptDelta;
+              currentTranscript += transcriptDelta;
             }
             break;
 
           case 'response.audio_transcript.done':
             {
               const {transcript: finalTranscript} = event;
-              transcript = finalTranscript; // Ensure the transcript is complete
+              currentTranscript = finalTranscript; // Ensure the transcript is complete
             }
             break;
 
           case 'response.audio.done':
-            console.log('Finished receiving audio response.');
+            // Do not set processingCompleted here
+            break;
+
+          case 'response.done':
+            // Check if the response is incomplete due to content filter
+            if (
+              event.response &&
+              event.response.status === 'incomplete' &&
+              event.response.status_details?.reason === 'content_filter'
+            ) {
+              console.error(
+                'Content filter triggered. Response is incomplete.'
+              );
+              processingCompleted = true;
+              ws.close();
+              reject(
+                new Error(
+                  'Content filter triggered. Response was incomplete due to disallowed content.'
+                )
+              );
+              return;
+            }
 
             // Now, construct the WAV data
-            const wavData = createWavData(audioData);
+            const wavData = createWavData(currentAudioData);
 
-            // Save the audio and get the URL
-            saveAudioToFirebaseStorage(wavData)
-              .then((audioUrl) => {
-                // Set the flag to prevent further processing
-                processingCompleted = true;
+            if (currentMessageIndex === 1) {
+              // This is the second message, save the audio
+              saveAudioToFirebaseStorage(wavData)
+                .then((audioUrl) => {
+                  // Set the flag to prevent further processing
+                  processingCompleted = true;
 
-                // Close the WebSocket connection
-                ws.close();
+                  // Close the WebSocket connection
+                  ws.close();
 
-                // Resolve the Promise with the response data
-                resolve({
-                  audioUrl,
-                  transcript,
-                  error: '',
+                  // Resolve the Promise with the response data
+                  resolve({
+                    audioUrl,
+                    transcript: currentTranscript,
+                    error: '',
+                  });
+                })
+                .catch((error) => {
+                  console.error('Error saving audio:', error);
+
+                  // Set the flag to prevent further processing
+                  processingCompleted = true;
+
+                  // Close the WebSocket connection
+                  ws.close();
+
+                  reject(error);
                 });
-              })
-              .catch((error) => {
-                console.error('Error saving audio:', error);
+            } else {
+              // Discard the audio and send the next message
+              currentMessageIndex++;
+              sendNextMessage();
+            }
 
-                // Set the flag to prevent further processing
-                processingCompleted = true;
-
-                // Close the WebSocket connection
-                ws.close();
-
-                reject(error);
-              });
             break;
 
           case 'error':
@@ -301,8 +368,6 @@ export async function sendMessageAndGetResponse(
       reject(err);
     });
 
-    ws.on('close', () => {
-      console.log('WebSocket connection closed');
-    });
+    ws.on('close', () => {});
   });
 }
